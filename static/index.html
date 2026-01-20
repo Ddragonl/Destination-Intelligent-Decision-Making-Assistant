@@ -1,0 +1,771 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>目的地自主决策智能体</title>
+    <!-- 高德地图JavaScript API -->
+    <!-- 注意：需要替换YOUR_AMAP_WEB_KEY为你的高德地图Web API Key -->
+    <!-- 获取方式：https://lbs.amap.com/api/javascript-api/guide/abc/prepare -->
+    <script type="text/javascript" src="https://webapi.amap.com/maps?v=2.0&key=YOUR_AMAP_WEB_KEY"></script>
+    <script type="text/javascript" src="https://webapi.amap.com/ui/1.1/main.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 32px;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            opacity: 0.9;
+            font-size: 16px;
+        }
+
+        .content {
+            display: grid;
+            grid-template-columns: 400px 1fr;
+            gap: 0;
+            min-height: 600px;
+        }
+
+        .sidebar {
+            background: #f8f9fa;
+            padding: 30px;
+            overflow-y: auto;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 500;
+            font-size: 14px;
+        }
+
+        .form-group input,
+        .form-group select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .btn {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .map-container {
+            position: relative;
+            height: 100%;
+            min-height: 600px;
+        }
+
+        #map {
+            width: 100%;
+            height: 100%;
+        }
+
+        .result-panel {
+            margin-top: 30px;
+            padding: 20px;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            display: none;
+        }
+
+        .result-panel.show {
+            display: block;
+        }
+
+        .result-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #f0f0f0;
+        }
+
+        .result-header h2 {
+            color: #333;
+            font-size: 20px;
+            margin-left: 10px;
+        }
+
+        .destination-info {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+        }
+
+        .destination-info h3 {
+            color: #667eea;
+            font-size: 18px;
+            margin-bottom: 10px;
+        }
+
+        .destination-info p {
+            color: #666;
+            margin: 5px 0;
+            font-size: 14px;
+        }
+
+        .route-info {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+
+        .route-item {
+            background: white;
+            padding: 12px;
+            border-radius: 8px;
+            border: 1px solid #e0e0e0;
+        }
+
+        .route-item label {
+            display: block;
+            color: #999;
+            font-size: 12px;
+            margin-bottom: 5px;
+        }
+
+        .route-item .value {
+            color: #333;
+            font-size: 16px;
+            font-weight: 600;
+        }
+
+        .route-details {
+            margin-top: 15px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+
+        .route-details h4 {
+            color: #333;
+            font-size: 16px;
+            margin-bottom: 10px;
+        }
+
+        .route-step {
+            padding: 10px;
+            margin: 8px 0;
+            background: white;
+            border-radius: 6px;
+            border-left: 3px solid #667eea;
+            font-size: 14px;
+            color: #666;
+        }
+
+        .alternatives {
+            margin-top: 20px;
+        }
+
+        .alternatives h4 {
+            color: #333;
+            font-size: 16px;
+            margin-bottom: 10px;
+        }
+
+        .alternative-item {
+            padding: 12px;
+            margin: 8px 0;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border-left: 3px solid #999;
+            font-size: 14px;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+            display: none;
+        }
+
+        .loading.show {
+            display: block;
+        }
+
+        .loading-spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .error-message {
+            background: #fee;
+            color: #c33;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 20px;
+            display: none;
+        }
+
+        .error-message.show {
+            display: block;
+        }
+
+        @media (max-width: 1024px) {
+            .content {
+                grid-template-columns: 1fr;
+            }
+
+            .sidebar {
+                max-height: 400px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🗺️ 目的地自主决策智能体</h1>
+            <p>智能推荐最优目的地和交通方案</p>
+        </div>
+
+        <div class="content">
+            <div class="sidebar">
+                <form id="queryForm">
+                    <div class="form-group">
+                        <label for="userLocation">📍 我的位置</label>
+                        <input type="text" id="userLocation" name="userLocation" 
+                               placeholder="例如：浙江大学紫金港校区" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="storeName">🏪 连锁店名称</label>
+                        <input type="text" id="storeName" name="storeName" 
+                               placeholder="例如：联想电脑专卖店" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="city">🏙️ 所在城市</label>
+                        <input type="text" id="city" name="city" 
+                               placeholder="例如：杭州" value="杭州" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="trafficMode">🚌 交通方式</label>
+                        <select id="trafficMode" name="trafficMode">
+                            <option value="">自动选择最优</option>
+                            <option value="transit">公共交通（公交/地铁）</option>
+                            <option value="driving">驾车</option>
+                            <option value="walking">步行</option>
+                            <option value="riding">骑行</option>
+                        </select>
+                    </div>
+
+                    <button type="submit" class="btn" id="submitBtn">
+                        🔍 开始查询
+                    </button>
+                </form>
+
+                <div class="loading" id="loading">
+                    <div class="loading-spinner"></div>
+                    <p>正在查询中，请稍候...</p>
+                </div>
+
+                <div class="error-message" id="errorMessage"></div>
+
+                <div class="result-panel" id="resultPanel">
+                    <div class="result-header">
+                        <span style="font-size: 24px;">✅</span>
+                        <h2>推荐结果</h2>
+                    </div>
+
+                    <div class="destination-info" id="destinationInfo"></div>
+
+                    <div class="route-info" id="routeInfo"></div>
+
+                    <div class="route-details" id="routeDetails"></div>
+
+                    <div class="alternatives" id="alternatives"></div>
+                </div>
+            </div>
+
+            <div class="map-container">
+                <div id="map"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 注意：需要替换为你的高德地图Web API Key
+        // 如果已经在HTML中设置了，这里可以留空
+        const AMAP_WEB_KEY = 'YOUR_AMAP_WEB_KEY';
+
+        let map;
+        let markers = [];
+        let routePolyline = null;
+
+        // 初始化地图
+        function initMap() {
+            map = new AMap.Map('map', {
+                zoom: 13,
+                center: [120.153576, 30.287459], // 杭州市中心
+                viewMode: '3D'
+            });
+
+            // 添加地图控件
+            map.addControl(new AMap.Scale());
+            map.addControl(new AMap.ToolBar());
+        }
+
+        // 清除地图上的标记和路线
+        function clearMap() {
+            markers.forEach(marker => map.remove(marker));
+            markers = [];
+            if (routePolyline) {
+                map.remove(routePolyline);
+                routePolyline = null;
+            }
+        }
+
+        // 在地图上显示路线
+        function displayRoute(routeData) {
+            clearMap();
+
+            const origin = routeData.recommendation.destination.coordinates;
+            const destination = routeData.recommendation.destination.coordinates;
+            
+            // 获取起点坐标（需要从API返回的数据中获取）
+            // 这里假设API返回了起点的坐标信息
+            // 如果没有，我们需要先地理编码起点
+            
+            // 显示目的地标记
+            const destMarker = new AMap.Marker({
+                position: [destination.longitude, destination.latitude],
+                title: routeData.recommendation.destination.name,
+                icon: new AMap.Icon({
+                    size: new AMap.Size(40, 50),
+                    image: 'https://webapi.amap.com/theme/v1.3/markers/n/mid_r.png',
+                    imageOffset: new AMap.Pixel(-9, -3),
+                    imageSize: new AMap.Size(18, 25)
+                })
+            });
+            markers.push(destMarker);
+            map.add(destMarker);
+
+            // 如果有路线详情，绘制路线
+            if (routeData.recommendation.route.details && routeData.recommendation.route.details.length > 0) {
+                // 从路线详情中提取坐标点
+                const path = extractPathFromDetails(routeData.recommendation.route.details);
+                if (path.length > 0) {
+                    routePolyline = new AMap.Polyline({
+                        path: path,
+                        isOutline: true,
+                        outlineColor: '#ffeeff',
+                        borderWeight: 3,
+                        strokeColor: '#3366FF',
+                        strokeOpacity: 1,
+                        strokeWeight: 6,
+                        strokeStyle: 'solid',
+                        lineJoin: 'round',
+                        lineCap: 'round',
+                        zIndex: 50
+                    });
+                    map.add(routePolyline);
+                    map.setFitView([routePolyline]);
+                }
+            } else {
+                // 如果没有详细路线，至少显示起点和终点
+                map.setCenter([destination.longitude, destination.latitude]);
+                map.setZoom(15);
+            }
+        }
+
+        // 从路线详情中提取路径点（简化版本）
+        function extractPathFromDetails(details) {
+            // 这里需要根据实际的路线数据格式来提取
+            // 由于高德地图API返回的路线数据格式复杂，这里提供一个简化版本
+            // 实际使用时，可能需要调用高德地图的路径规划API来获取完整的路径坐标
+            return [];
+        }
+
+        // 地理编码起点
+        async function geocodeAddress(address) {
+            return new Promise((resolve, reject) => {
+                const geocoder = new AMap.Geocoder();
+                geocoder.getLocation(address, (status, result) => {
+                    if (status === 'complete' && result.geocodes.length > 0) {
+                        const location = result.geocodes[0].location;
+                        resolve([location.lng, location.lat]);
+                    } else {
+                        reject(new Error('地理编码失败'));
+                    }
+                });
+            });
+        }
+
+        // 查询路线并在地图上显示
+        async function queryAndDisplayRoute() {
+            const userLocation = document.getElementById('userLocation').value;
+            const storeName = document.getElementById('storeName').value;
+            const city = document.getElementById('city').value;
+            const trafficMode = document.getElementById('trafficMode').value;
+
+            // 显示加载状态
+            document.getElementById('loading').classList.add('show');
+            document.getElementById('resultPanel').classList.remove('show');
+            document.getElementById('errorMessage').classList.remove('show');
+            document.getElementById('submitBtn').disabled = true;
+
+            try {
+                // 调用后端API
+                const response = await fetch('/api/query', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        user_location: userLocation,
+                        store_name: storeName,
+                        city: city,
+                        preferred_mode: trafficMode || null
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    // 显示结果
+                    displayResult(data);
+                    
+                    // 在地图上显示路线
+                    await displayRouteOnMap(data, userLocation);
+                } else {
+                    showError(data.error || '查询失败');
+                }
+            } catch (error) {
+                showError('网络错误：' + error.message);
+            } finally {
+                document.getElementById('loading').classList.remove('show');
+                document.getElementById('submitBtn').disabled = false;
+            }
+        }
+
+        // 在地图上显示完整路线
+        async function displayRouteOnMap(routeData, userLocationStr) {
+            clearMap();
+
+            try {
+                // 地理编码起点
+                const originCoords = await geocodeAddress(userLocationStr);
+                
+                // 目的地坐标
+                const destCoords = [
+                    routeData.recommendation.destination.coordinates.longitude,
+                    routeData.recommendation.destination.coordinates.latitude
+                ];
+
+                // 添加起点标记
+                const originMarker = new AMap.Marker({
+                    position: originCoords,
+                    title: '起点',
+                    icon: new AMap.Icon({
+                        size: new AMap.Size(40, 50),
+                        image: 'https://webapi.amap.com/theme/v1.3/markers/n/mid_b.png',
+                        imageOffset: new AMap.Pixel(-9, -3),
+                        imageSize: new AMap.Size(18, 25)
+                    })
+                });
+                markers.push(originMarker);
+                map.add(originMarker);
+
+                // 添加终点标记
+                const destMarker = new AMap.Marker({
+                    position: destCoords,
+                    title: routeData.recommendation.destination.name,
+                    icon: new AMap.Icon({
+                        size: new AMap.Size(40, 50),
+                        image: 'https://webapi.amap.com/theme/v1.3/markers/n/mid_r.png',
+                        imageOffset: new AMap.Pixel(-9, -3),
+                        imageSize: new AMap.Size(18, 25)
+                    })
+                });
+                markers.push(destMarker);
+                map.add(destMarker);
+
+                // 根据交通方式绘制路线
+                const mode = routeData.recommendation.route.traffic_mode;
+                await drawRoute(originCoords, destCoords, mode);
+
+                // 调整地图视野
+                map.setFitView(markers);
+            } catch (error) {
+                console.error('地图显示错误:', error);
+                // 即使路线绘制失败，至少显示目的地
+                const destCoords = [
+                    routeData.recommendation.destination.coordinates.longitude,
+                    routeData.recommendation.destination.coordinates.latitude
+                ];
+                map.setCenter(destCoords);
+                map.setZoom(15);
+            }
+        }
+
+        // 绘制路线
+        async function drawRoute(origin, destination, mode) {
+            return new Promise((resolve, reject) => {
+                let routeService;
+                
+                if (mode === 'transit') {
+                    // 公交路线规划
+                    routeService = new AMap.Transfer({
+                        map: map,
+                        city: document.getElementById('city').value,
+                        panel: null,
+                        hideMarkers: false
+                    });
+                    routeService.search([
+                        new AMap.LngLat(origin[0], origin[1]),
+                        new AMap.LngLat(destination[0], destination[1])
+                    ], (status, result) => {
+                        if (status === 'complete') {
+                            resolve();
+                        } else {
+                            console.warn('公交路线规划失败，使用直线连接');
+                            drawStraightLine(origin, destination);
+                            resolve();
+                        }
+                    });
+                } else if (mode === 'driving') {
+                    // 驾车路线规划
+                    routeService = new AMap.Driving({
+                        map: map,
+                        panel: null,
+                        hideMarkers: false
+                    });
+                    routeService.search(new AMap.LngLat(origin[0], origin[1]), 
+                                  new AMap.LngLat(destination[0], destination[1]), 
+                                  (status, result) => {
+                        if (status === 'complete') {
+                            resolve();
+                        } else {
+                            console.warn('驾车路线规划失败，使用直线连接');
+                            drawStraightLine(origin, destination);
+                            resolve();
+                        }
+                    });
+                } else if (mode === 'walking') {
+                    // 步行路线规划
+                    routeService = new AMap.Walking({
+                        map: map,
+                        panel: null,
+                        hideMarkers: false
+                    });
+                    routeService.search(new AMap.LngLat(origin[0], origin[1]), 
+                                  new AMap.LngLat(destination[0], destination[1]), 
+                                  (status, result) => {
+                        if (status === 'complete') {
+                            resolve();
+                        } else {
+                            console.warn('步行路线规划失败，使用直线连接');
+                            drawStraightLine(origin, destination);
+                            resolve();
+                        }
+                    });
+                } else {
+                    // 骑行或其他，使用直线连接
+                    drawStraightLine(origin, destination);
+                    resolve();
+                }
+            });
+        }
+
+        // 绘制直线连接（备用方案）
+        function drawStraightLine(origin, destination) {
+            if (routePolyline) {
+                map.remove(routePolyline);
+            }
+            routePolyline = new AMap.Polyline({
+                path: [
+                    new AMap.LngLat(origin[0], origin[1]),
+                    new AMap.LngLat(destination[0], destination[1])
+                ],
+                strokeColor: '#3366FF',
+                strokeWeight: 4,
+                strokeOpacity: 0.8,
+                strokeStyle: 'dashed'
+            });
+            map.add(routePolyline);
+        }
+
+        // 显示查询结果
+        function displayResult(data) {
+            const rec = data.recommendation;
+            const route = rec.route;
+
+            // 显示目的地信息
+            document.getElementById('destinationInfo').innerHTML = `
+                <h3>${rec.destination.name}</h3>
+                <p>📍 ${rec.destination.address}</p>
+            `;
+
+            // 显示路线信息
+            document.getElementById('routeInfo').innerHTML = `
+                <div class="route-item">
+                    <label>交通方式</label>
+                    <div class="value">${route.traffic_mode_cn}</div>
+                </div>
+                <div class="route-item">
+                    <label>预计时间</label>
+                    <div class="value">${route.duration_formatted}</div>
+                </div>
+                <div class="route-item">
+                    <label>距离</label>
+                    <div class="value">${route.distance_formatted}</div>
+                </div>
+                ${route.cost ? `
+                <div class="route-item">
+                    <label>费用</label>
+                    <div class="value">${route.cost}元</div>
+                </div>
+                ` : ''}
+            `;
+
+            // 显示详细路线
+            if (route.details && route.details.length > 0) {
+                let detailsHtml = '<h4>📋 详细路线</h4>';
+                route.details.forEach((detail, index) => {
+                    if (detail.type === 'walking') {
+                        detailsHtml += `<div class="route-step">${index + 1}. 🚶 ${detail.instruction}</div>`;
+                    } else if (detail.type === 'bus') {
+                        detailsHtml += `<div class="route-step">${index + 1}. 🚌 ${detail.instruction}<br>
+                            <small style="color: #999;">从 ${detail.departure} 到 ${detail.arrival}</small></div>`;
+                    } else if (detail.type === 'subway') {
+                        detailsHtml += `<div class="route-step">${index + 1}. 🚇 ${detail.instruction}<br>
+                            <small style="color: #999;">从 ${detail.departure} 到 ${detail.arrival}</small></div>`;
+                    } else {
+                        detailsHtml += `<div class="route-step">${index + 1}. ${detail.instruction || ''}</div>`;
+                    }
+                });
+                document.getElementById('routeDetails').innerHTML = detailsHtml;
+            } else if (route.summary) {
+                document.getElementById('routeDetails').innerHTML = `
+                    <h4>📋 路线摘要</h4>
+                    <div class="route-step">${route.summary}</div>
+                `;
+            } else {
+                document.getElementById('routeDetails').innerHTML = '';
+            }
+
+            // 显示备选方案
+            if (data.alternatives && data.alternatives.length > 0) {
+                let altHtml = '<h4>🔄 备选方案</h4>';
+                data.alternatives.forEach((alt, index) => {
+                    altHtml += `
+                        <div class="alternative-item">
+                            <strong>${alt.destination}</strong><br>
+                            <small>${alt.traffic_mode} · ${alt.duration} · ${alt.distance}</small>
+                        </div>
+                    `;
+                });
+                document.getElementById('alternatives').innerHTML = altHtml;
+            } else {
+                document.getElementById('alternatives').innerHTML = '';
+            }
+
+            // 显示结果面板
+            document.getElementById('resultPanel').classList.add('show');
+        }
+
+        // 显示错误信息
+        function showError(message) {
+            const errorEl = document.getElementById('errorMessage');
+            errorEl.textContent = '❌ ' + message;
+            errorEl.classList.add('show');
+        }
+
+        // 表单提交事件
+        document.getElementById('queryForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            queryAndDisplayRoute();
+        });
+
+        // 页面加载完成后初始化地图
+        window.onload = () => {
+            initMap();
+        };
+    </script>
+</body>
+</html>
+
